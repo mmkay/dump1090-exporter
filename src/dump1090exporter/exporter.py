@@ -498,11 +498,14 @@ class Dump1090Exporter:
         }
         # Filter aircraft to only those that have been seen within the
         # last n seconds to minimise contributions from aged observations.
+        d = self.metrics["aircraft"]
         for a in aircraft["aircraft"]:
             if a["seen"] < threshold:
                 aircraft_observed += 1
             if a["seen_pos"] and a["seen_pos"] < threshold:
                 aircraft_with_pos += 1
+                d["lat"].set({"category": a["category"], "flight": a["flight"], "hex": a[hex]}, a["lat"])
+                d["lon"].set({"category": a["category"], "flight": a["flight"], "hex": a[hex]}, a["lon"])
                 if self.origin:
                     distance = haversine_distance(
                         self.origin, Position(a["lat"], a["lon"])
@@ -523,7 +526,6 @@ class Dump1090Exporter:
 
         # Add any current data into the 'latest' time_period bucket
         labels = dict(time_period="latest")
-        d = self.metrics["aircraft"]
         d["observed"].set(labels, aircraft_observed)
         d["observed_with_pos"].set(labels, aircraft_with_pos)
         d["observed_with_mlat"].set(labels, aircraft_with_mlat)

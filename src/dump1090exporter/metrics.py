@@ -83,6 +83,16 @@ Specs = {
             "messages_total",
             "Number of Mode-S messages processed since start up",
         ),
+        (
+            "lat",
+            "lat",
+            "Latitude of an aircraft",
+        ),
+        (
+            "lon",
+            "lon",
+            "Longitude of an aircraft",
+        ),
     ),
     "stats": {
         # top level items not in a sub-group are listed under this empty key.
@@ -238,5 +248,8 @@ Specs = {
                 "Number of tracks consisting of only a single message",
             ),
         ),
+    },
+    "live": {
+
     },
 }
