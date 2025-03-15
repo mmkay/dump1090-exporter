@@ -101,3 +101,6 @@ demo/prometheus/chunks_head
 demo/prometheus/lock
 demo/prometheus/queries.active
 demo/prometheus/wal
+
+# PyCharm
+.idea/
