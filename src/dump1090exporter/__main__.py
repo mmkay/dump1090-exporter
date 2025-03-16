@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import logging
+import os
 
 from .exporter import Dump1090Exporter
 
@@ -33,16 +34,16 @@ def main():
         "--resource-path",
         metavar="<dump1090 url or dirpath>",
         type=str,
-        default=DEFAULT_RESOURCE_PATH,
+        default=os.environ.get("RESOURCE_PATH") or DEFAULT_RESOURCE_PATH,
         help=f"dump1090 data URL or file system path. Default value is {DEFAULT_RESOURCE_PATH}",
     )
     parser.add_argument(
         "--host",
         metavar="<exporter host>",
         type=str,
-        default=DEFAULT_HOST,
+        default=os.environ.get("HOST") or DEFAULT_HOST,
         help=(
-            "The address to expose collected metrics from. "
+            "The address to expose collected metrics on. "
             f"Default is all interfaces ({DEFAULT_HOST})."
         ),
     )
@@ -50,14 +51,14 @@ def main():
         "--port",
         metavar="<exporter port>",
         type=int,
-        default=DEFAULT_PORT,
-        help=f"The port to expose collected metrics from. Default is {DEFAULT_PORT}",
+        default=os.environ.get("PORT") or DEFAULT_PORT,
+        help=f"The port to expose collected metrics on. Default is {DEFAULT_PORT}",
     )
     parser.add_argument(
         "--aircraft-interval",
         metavar="<aircraft data refresh interval>",
         type=int,
-        default=DEFAULT_AIRCRAFT_REFRESH_INTERVAL,
+        default=os.environ.get("AIRCRAFT_INTERVAL") or DEFAULT_AIRCRAFT_REFRESH_INTERVAL,
         help=(
             "The number of seconds between updates of the aircraft data. "
             f"Default is {DEFAULT_AIRCRAFT_REFRESH_INTERVAL} seconds"
@@ -67,7 +68,7 @@ def main():
         "--stats-interval",
         metavar="<stats data refresh interval>",
         type=int,
-        default=DEFAULT_STATISTICS_REFRESH_INTERVAL,
+        default=os.environ.get("STATS_INTERVAL") or DEFAULT_STATISTICS_REFRESH_INTERVAL,
         help=(
             "The number of seconds between updates of the stats data. "
             f"Default is {DEFAULT_STATISTICS_REFRESH_INTERVAL} seconds"
@@ -77,7 +78,7 @@ def main():
         "--receiver-interval",
         metavar="<receiver data refresh interval>",
         type=int,
-        default=DEFAULT_RECEIVER_REFRESH_INTERVAL,
+        default=os.environ.get("RECEIVER_INTERVAL") or DEFAULT_RECEIVER_REFRESH_INTERVAL,
         help=(
             "The number of seconds between updates of the receiver data. "
             f"Default is {DEFAULT_RECEIVER_REFRESH_INTERVAL} seconds"
@@ -87,20 +88,20 @@ def main():
         "--latitude",
         metavar="<receiver latitude>",
         type=float,
-        default=None,
+        default=os.environ.get("LATITUDE"),
         help="The latitude of the receiver position to use as the origin.",
     )
     parser.add_argument(
         "--longitude",
         metavar="<receiver longitude>",
         type=float,
-        default=None,
+        default=os.environ.get("LONGITUDE"),
         help="The longitude of the receiver position to use as the origin.",
     )
     parser.add_argument(
         "--log-level",
         choices=LOGGING_CHOICES,
-        default=DEFAULT_LOGGING_LEVEL,
+        default=os.environ.get("LOG_LEVEL") or DEFAULT_LOGGING_LEVEL,
         type=str,
         help=f"A logging level from {LOGGING_CHOICES}. Default value is '{DEFAULT_LOGGING_LEVEL}'.",
     )
