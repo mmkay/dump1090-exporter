@@ -23,6 +23,30 @@ DEFAULT_STATISTICS_REFRESH_INTERVAL = 60
 LOGGING_CHOICES = ["error", "warning", "info", "debug"]
 DEFAULT_LOGGING_LEVEL = "info"
 
+# Courtesy of http://stackoverflow.com/a/10551190 with env-var retrieval fixed
+# src https://gist.github.com/orls/51525c86ee77a56ad396
+class EnvDefault(argparse.Action):
+    """An argparse action class that auto-sets missing default values from env
+    vars. Defaults to requiring the argument."""
+
+    def __init__(self, envvar, required=True, default=None, **kwargs):
+        if not default and envvar:
+            if envvar in os.environ:
+                default = os.environ[envvar]
+        if required and default:
+            required = False
+        super(EnvDefault, self).__init__(default=default, required=required,
+                                         **kwargs)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        setattr(namespace, self.dest, values)
+
+# functional sugar for the above
+def env_default(envvar):
+    def wrapper(**kwargs):
+        return EnvDefault(envvar, **kwargs)
+    return wrapper
+
 
 def main():
     """Run the dump1090 Prometheus exporter"""
@@ -34,14 +58,16 @@ def main():
         "--resource-path",
         metavar="<dump1090 url or dirpath>",
         type=str,
-        default=os.environ.get("RESOURCE_PATH") or DEFAULT_RESOURCE_PATH,
+        action=env_default("RESOURCE_PATH"),
+        default=DEFAULT_RESOURCE_PATH,
         help=f"dump1090 data URL or file system path. Default value is {DEFAULT_RESOURCE_PATH}",
     )
     parser.add_argument(
         "--host",
         metavar="<exporter host>",
         type=str,
-        default=os.environ.get("HOST") or DEFAULT_HOST,
+        action=env_default("HOST"),
+        default=DEFAULT_HOST,
         help=(
             "The address to expose collected metrics on. "
             f"Default is all interfaces ({DEFAULT_HOST})."
@@ -51,14 +77,16 @@ def main():
         "--port",
         metavar="<exporter port>",
         type=int,
-        default=os.environ.get("PORT") or DEFAULT_PORT,
+        action=env_default("PORT"),
+        default=DEFAULT_PORT,
         help=f"The port to expose collected metrics on. Default is {DEFAULT_PORT}",
     )
     parser.add_argument(
         "--aircraft-interval",
         metavar="<aircraft data refresh interval>",
         type=int,
-        default=os.environ.get("AIRCRAFT_INTERVAL") or DEFAULT_AIRCRAFT_REFRESH_INTERVAL,
+        action=env_default("AIRCRAFT_INTERVAL"),
+        default=DEFAULT_AIRCRAFT_REFRESH_INTERVAL,
         help=(
             "The number of seconds between updates of the aircraft data. "
             f"Default is {DEFAULT_AIRCRAFT_REFRESH_INTERVAL} seconds"
@@ -68,7 +96,8 @@ def main():
         "--stats-interval",
         metavar="<stats data refresh interval>",
         type=int,
-        default=os.environ.get("STATS_INTERVAL") or DEFAULT_STATISTICS_REFRESH_INTERVAL,
+        action=env_default("STATS_INTERVAL"),
+        default=DEFAULT_STATISTICS_REFRESH_INTERVAL,
         help=(
             "The number of seconds between updates of the stats data. "
             f"Default is {DEFAULT_STATISTICS_REFRESH_INTERVAL} seconds"
@@ -78,7 +107,8 @@ def main():
         "--receiver-interval",
         metavar="<receiver data refresh interval>",
         type=int,
-        default=os.environ.get("RECEIVER_INTERVAL") or DEFAULT_RECEIVER_REFRESH_INTERVAL,
+        action=env_default("RECEIVER_INTERVAL"),
+        default=DEFAULT_RECEIVER_REFRESH_INTERVAL,
         help=(
             "The number of seconds between updates of the receiver data. "
             f"Default is {DEFAULT_RECEIVER_REFRESH_INTERVAL} seconds"
@@ -88,20 +118,21 @@ def main():
         "--latitude",
         metavar="<receiver latitude>",
         type=float,
-        default=os.environ.get("LATITUDE"),
+        action=env_default("LATITUDE"),
         help="The latitude of the receiver position to use as the origin.",
     )
     parser.add_argument(
         "--longitude",
         metavar="<receiver longitude>",
         type=float,
-        default=os.environ.get("LONGITUDE"),
+        action=env_default("LONGITUDE"),
         help="The longitude of the receiver position to use as the origin.",
     )
     parser.add_argument(
         "--log-level",
         choices=LOGGING_CHOICES,
-        default=os.environ.get("LOG_LEVEL") or DEFAULT_LOGGING_LEVEL,
+        action=env_default("LOG_LEVEL"),
+        default=DEFAULT_LOGGING_LEVEL,
         type=str,
         help=f"A logging level from {LOGGING_CHOICES}. Default value is '{DEFAULT_LOGGING_LEVEL}'.",
     )
