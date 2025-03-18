@@ -504,8 +504,9 @@ class Dump1090Exporter:
                 aircraft_observed += 1
             if a["seen_pos"] and a["seen_pos"] < threshold:
                 aircraft_with_pos += 1
-                d["lat"].set({"category": a["category"], "flight": a["flight"], "hex": a["hex"]}, a["lat"])
-                d["lon"].set({"category": a["category"], "flight": a["flight"], "hex": a["hex"]}, a["lon"])
+                d["lat"].set({"flight": a["flight"], "hex": a["hex"]}, a["lat"])
+                d["lon"].set({"flight": a["flight"], "hex": a["hex"]}, a["lon"])
+                d["alt"].set({"flight": a["flight"], "hex": a["hex"]}, a["altitude"])
                 if self.origin:
                     distance = haversine_distance(
                         self.origin, Position(a["lat"], a["lon"])

@@ -93,6 +93,11 @@ Specs = {
             "lon",
             "Longitude of an aircraft",
         ),
+        (
+            "alt",
+            "alt",
+            "Altitude of an aircraft",
+        ),
     ),
     "stats": {
         # top level items not in a sub-group are listed under this empty key.
