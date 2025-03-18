@@ -4,7 +4,7 @@ services:
     image: ghcr.io/mmkay/dump1090-exporter:main
     container_name: dump1090-exporter
     environment:
-      - RESOURCE_PATH=http://localhost:8080/data/
+      - RESOURCE_PATH=http://172.17.0.1:8080/data/
     ports:
       - 9105:9105
     restart: unless-stopped
