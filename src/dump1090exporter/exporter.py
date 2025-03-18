@@ -506,7 +506,8 @@ class Dump1090Exporter:
                 aircraft_with_pos += 1
                 d["lat"].set({"flight": a["flight"], "hex": a["hex"]}, a["lat"])
                 d["lon"].set({"flight": a["flight"], "hex": a["hex"]}, a["lon"])
-                d["alt"].set({"flight": a["flight"], "hex": a["hex"]}, a["altitude"])
+                if a["altitude"]:
+                    d["alt"].set({"flight": a["flight"], "hex": a["hex"]}, a["altitude"])
                 if self.origin:
                     distance = haversine_distance(
                         self.origin, Position(a["lat"], a["lon"])
