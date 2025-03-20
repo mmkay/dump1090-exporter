@@ -409,7 +409,7 @@ class Dump1090Exporter:
                 aircraft = await self._fetch(self.resources.aircraft)
                 self.process_aircraft(aircraft)
             except Exception as exc:  # pylint: disable=broad-except
-                logger.error(f"Error fetching dump1090 aircraft data: {exc}")
+                logger.exception(f"Error fetching dump1090 aircraft data")
 
             # wait until next collection time
             end = datetime.datetime.now()
@@ -504,10 +504,34 @@ class Dump1090Exporter:
                 aircraft_observed += 1
             if a["seen_pos"] and a["seen_pos"] < threshold:
                 aircraft_with_pos += 1
-                d["lat"].set({"flight": a["flight"], "hex": a["hex"]}, a["lat"])
-                d["lon"].set({"flight": a["flight"], "hex": a["hex"]}, a["lon"])
-                if a["altitude"]:
-                    d["alt"].set({"flight": a["flight"], "hex": a["hex"]}, a["altitude"])
+                flight_no = a["flight"].strip() if "flight" in a and a["flight"] else None
+                plane_hex = a["hex"]
+                d["lat"].set({"flight": flight_no, "hex": plane_hex}, a["lat"])
+                d["lon"].set({"flight": flight_no, "hex": plane_hex}, a["lon"])
+                if "alt_geom" in a:
+                    # try setting the altitude based on alt_geom first
+                    if a["alt_geom"] == 'ground':
+                        d["alt"].set({"flight": flight_no, "hex": plane_hex}, 0)
+                    else:
+                        d["alt"].set({"flight": flight_no, "hex": plane_hex}, a["alt_geom"])
+                elif "alt_baro" in a:
+                    if a["alt_baro"] == 'ground':
+                        d["alt"].set({"flight": flight_no, "hex": plane_hex}, 0)
+                    else:
+                        d["alt"].set({"flight": flight_no, "hex": plane_hex}, a["alt_baro"])
+                heading = None
+                if "track" in a:
+                    # this may feel confusing. I'm taking the track as the first option, then name it "heading"
+                    # because the latter concept is more widely known in aviation.
+                    # I guess I might back out from this choice later, though, as I see where it might be reasonable
+                    # to show all the metrics.
+                    heading = a["track"]
+                elif "true_heading" in a:
+                    heading = a["true_heading"]
+                elif "mag_heading" in a:
+                    heading = a["mag_heading"]
+                if heading is not None:
+                    d["heading"].set({"flight": flight_no, "hex": plane_hex}, heading)
                 if self.origin:
                     distance = haversine_distance(
                         self.origin, Position(a["lat"], a["lon"])
