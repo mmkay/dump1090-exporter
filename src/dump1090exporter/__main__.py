@@ -15,6 +15,7 @@ except ImportError:
 
 
 DEFAULT_RESOURCE_PATH = "http://localhost:8080/data"
+DEFAULT_DB_PATH = "http://localhost:8080/db"
 DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 9105
 DEFAULT_RECEIVER_REFRESH_INTERVAL = 10
@@ -105,6 +106,13 @@ def main():
         type=str,
         help=f"A logging level from {LOGGING_CHOICES}. Default value is '{DEFAULT_LOGGING_LEVEL}'.",
     )
+    parser.add_argument(
+        "--db-path",
+        metavar="<dump1090 url>",
+        type=str,
+        default=os.environ.get("DB_PATH") or "",
+        help=f"dump1090 data URL. Default value is an empty string, meaning database will not be fetched.",
+    )
 
     args = parser.parse_args()
 
@@ -127,6 +135,7 @@ def main():
         stats_interval=args.stats_interval,
         receiver_interval=args.receiver_interval,
         origin=args.origin,
+        db_path=args.db_path,
     )
     loop.run_until_complete(mon.start())
     try:
