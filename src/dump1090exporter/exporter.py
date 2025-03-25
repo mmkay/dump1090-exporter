@@ -126,7 +126,6 @@ async def build_knowledge_base(db: str) -> KnowledgeBase:
             knowledge_base.aircraft.update(filled_planes)
             file_no += 1
         logger.info(f"Database construction finished. {len(knowledge_base.aircraft)} aircraft found.")
-        logger.info(f"{knowledge_base}")
     else:
         logger.info("No database provided. Planes will not be enhanced with their registration data.")
     return knowledge_base
