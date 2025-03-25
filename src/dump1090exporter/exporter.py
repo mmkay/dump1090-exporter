@@ -108,8 +108,28 @@ def build_resources(base: str) -> Dump1090Resources:
     return resources
 
 
-def build_knowledge_base(db: str) -> KnowledgeBase:
+async def build_knowledge_base(db: str) -> KnowledgeBase:
     """Fetch the aircraft database."""
+    knowledge_base = KnowledgeBase(
+        aircraft={}
+    )
+    if db and db != "":
+        logger.info("Database provided, building knowledge base to enhance the planes.")
+        file_no = 1
+        for file in AircraftFiles:
+            logger.info(f"Fetching file {file_no} out of {len(AircraftFiles)}. Planes so far: {len(knowledge_base.aircraft)}")
+            data = await _fetch(f"{db}/{file}", timeout=10.0)
+            # the data is partial: the prefix of each of the planes is in the file name!
+            filled_planes = {}
+            for key, value in data.items():
+                filled_planes[file.split(".json")[0] + key] = value
+            knowledge_base.aircraft.update(filled_planes)
+            file_no += 1
+        logger.info(f"Database construction finished. {len(knowledge_base.aircraft)} aircraft found.")
+        logger.info(f"{knowledge_base}")
+    else:
+        logger.info("No database provided. Planes will not be enhanced with their registration data.")
+    return knowledge_base
 
 
 def relative_angle(pos1: Position, pos2: Position) -> float:
@@ -229,6 +249,32 @@ def create_gauge_metric(label: str, doc: str, prefix: str = "") -> Gauge:
     return gauge
 
 
+async def _fetch(
+        resource: str,
+        timeout: float = 2.0
+) -> Dict[Any, Any]:
+    """Fetch JSON data from a web or file resource and return a dict"""
+    logger.debug(f"fetching {resource}")
+    if resource.startswith("http"):
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                        resource, timeout=timeout
+                ) as resp:
+                    if not resp.status == 200:
+                        raise Exception(f"Fetch failed {resp.status}: {resource}")
+                    data = await resp.json()
+        except asyncio.TimeoutError:
+            raise Exception(f"Request timed out to {resource}") from None
+        except aiohttp.ClientError as exc:
+            raise Exception(f"Client error {exc}, {resource}") from None
+    else:
+        with open(resource, "rt") as fd:  # pylint: disable=unspecified-encoding
+            data = json.loads(fd.read())
+
+    return data
+
+
 class Dump1090Exporter:
     """
     This class is responsible for fetching, parsing and exporting dump1090
@@ -281,7 +327,6 @@ class Dump1090Exporter:
           plane data in the metrics.
         """
         self.resources = build_resources(resource_path)
-        self.knowledge_base = build_knowledge_base(db_path)
         self.loop = asyncio.get_event_loop()
         self.host = host
         self.port = port
@@ -299,6 +344,8 @@ class Dump1090Exporter:
         self.receiver_task = None  # type: Optional[asyncio.Task]
         self.stats_task = None  # type: Optional[asyncio.Task]
         self.aircraft_task = None  # type: Optional[asyncio.Task]
+        self.db_path = db_path
+        self.knowledge_base = None
         self.initialise_metrics()
         logger.info(f"Monitoring dump1090 resources at: {self.resources.base}")
         logger.info(
@@ -308,6 +355,7 @@ class Dump1090Exporter:
 
     async def start(self) -> None:
         """Start the monitor"""
+        self.knowledge_base = await build_knowledge_base(self.db_path)
         await self.svr.start(addr=self.host, port=self.port)
         logger.info(f"serving dump1090 prometheus metrics on: {self.svr.metrics_url}")
 
@@ -372,30 +420,6 @@ class Dump1090Exporter:
             for name, label, doc in metrics_specs:
                 d[name] = create_gauge_metric(label, doc, prefix=self.prefix)
 
-    async def _fetch(
-            self,
-            resource: str,
-    ) -> Dict[Any, Any]:
-        """Fetch JSON data from a web or file resource and return a dict"""
-        logger.debug(f"fetching {resource}")
-        if resource.startswith("http"):
-            try:
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(
-                            resource, timeout=self.fetch_timeout
-                    ) as resp:
-                        if not resp.status == 200:
-                            raise Exception(f"Fetch failed {resp.status}: {resource}")
-                        data = await resp.json()
-            except asyncio.TimeoutError:
-                raise Exception(f"Request timed out to {resource}") from None
-            except aiohttp.ClientError as exc:
-                raise Exception(f"Client error {exc}, {resource}") from None
-        else:
-            with open(resource, "rt") as fd:  # pylint: disable=unspecified-encoding
-                data = json.loads(fd.read())
-
-        return data
 
     async def updater_receiver(self) -> None:
         """
@@ -406,7 +430,7 @@ class Dump1090Exporter:
         while True:
             start = datetime.datetime.now()
             try:
-                receiver = await self._fetch(self.resources.receiver)
+                receiver = await _fetch(self.resources.receiver)
                 if receiver:
                     if "lat" in receiver and "lon" in receiver:
                         self.origin = Position(receiver["lat"], receiver["lon"])
@@ -434,7 +458,7 @@ class Dump1090Exporter:
         while True:
             start = datetime.datetime.now()
             try:
-                stats = await self._fetch(self.resources.stats)
+                stats = await _fetch(self.resources.stats)
                 self.process_stats(stats, time_periods=self.stats_time_periods)
             except Exception as exc:  # pylint: disable=broad-except
                 logger.error(f"Error fetching dump1090 stats data: {exc}")
@@ -452,7 +476,7 @@ class Dump1090Exporter:
         while True:
             start = datetime.datetime.now()
             try:
-                aircraft = await self._fetch(self.resources.aircraft)
+                aircraft = await _fetch(self.resources.aircraft)
                 self.process_aircraft(aircraft)
             except Exception as exc:  # pylint: disable=broad-except
                 logger.exception(f"Error fetching dump1090 aircraft data")
@@ -551,20 +575,31 @@ class Dump1090Exporter:
             if a["seen_pos"] and a["seen_pos"] < threshold:
                 aircraft_with_pos += 1
                 flight_no = a["flight"].strip() if "flight" in a and a["flight"] else None
-                plane_hex = a["hex"]
-                d["lat"].set({"flight": flight_no, "hex": plane_hex}, a["lat"])
-                d["lon"].set({"flight": flight_no, "hex": plane_hex}, a["lon"])
+                plane_data = {
+                    "hex": a["hex"]
+                }
+                if flight_no:
+                    plane_data["flight"] = flight_no
+                if self.knowledge_base and a["hex"].upper() in self.knowledge_base.aircraft.keys():
+                    # data in knowledge base are in upper case. So we need to adjust our received hex to be upper-case
+                    known_plane_data = self.knowledge_base.aircraft[a["hex"].upper()]
+                    if "r" in known_plane_data.keys():
+                        plane_data["reg"] = known_plane_data["r"]
+                    if "t" in known_plane_data.keys():
+                        plane_data["type"] = known_plane_data["t"]
+                d["lat"].set(plane_data, a["lat"])
+                d["lon"].set(plane_data, a["lon"])
                 if "alt_geom" in a:
                     # try setting the altitude based on alt_geom first
                     if a["alt_geom"] == 'ground':
-                        d["alt"].set({"flight": flight_no, "hex": plane_hex}, 0)
+                        d["alt"].set(plane_data, 0)
                     else:
-                        d["alt"].set({"flight": flight_no, "hex": plane_hex}, a["alt_geom"])
+                        d["alt"].set(plane_data, a["alt_geom"])
                 elif "alt_baro" in a:
                     if a["alt_baro"] == 'ground':
-                        d["alt"].set({"flight": flight_no, "hex": plane_hex}, 0)
+                        d["alt"].set(plane_data, 0)
                     else:
-                        d["alt"].set({"flight": flight_no, "hex": plane_hex}, a["alt_baro"])
+                        d["alt"].set(plane_data, a["alt_baro"])
                 heading = None
                 if "track" in a:
                     # this may feel confusing. I'm taking the track as the first option, then name it "heading"
@@ -577,7 +612,7 @@ class Dump1090Exporter:
                 elif "mag_heading" in a:
                     heading = a["mag_heading"]
                 if heading is not None:
-                    d["heading"].set({"flight": flight_no, "hex": plane_hex}, heading)
+                    d["heading"].set(plane_data, heading)
                 if self.origin:
                     distance = haversine_distance(
                         self.origin, Position(a["lat"], a["lon"])
